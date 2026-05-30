@@ -1,0 +1,1232 @@
+{
+  "name": "Resume Analyzer - Gmail + Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const subject = $json.subject || $json.headers?.subject || '';\nconst fromHeader = $json.headers?.from || $json.from?.value?.[0]?.address || $json.from || '';\nconst match = String(fromHeader).match(/<(.+?)>/);\nconst recipientEmail = match?.[1] || String(fromHeader).trim();\n\nconst parts = String(subject).split('-');\nconst jobRole = parts.length > 1 ? parts.slice(1).join('-').trim() : 'General Software Engineer';\n\nconst supported = {\n  'application/pdf': 'pdf',\n  'text/plain': 'txt',\n  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',\n};\n\nlet selectedKey = null;\nlet fileType = '';\nlet fileName = '';\nlet mimeType = '';\n\nfor (const key of Object.keys($binary || {})) {\n  const item = $binary[key];\n  const name = item.fileName || key;\n  const mime = item.mimeType || '';\n  const ext = name.split('.').pop()?.toLowerCase() || '';\n  const type = supported[mime] || (['pdf', 'txt', 'docx'].includes(ext) ? ext : '');\n  if (type) {\n    selectedKey = key;\n    fileType = type;\n    fileName = name;\n    mimeType = mime;\n    break;\n  }\n}\n\nif (!selectedKey) {\n  return {\n    json: {\n      source: 'gmail',\n      action: 'unsupported_file',\n      recipientEmail,\n      jobRole,\n      subject,\n      message: 'Please attach a resume as PDF, DOCX, or TXT. Put the target role after a dash in the email subject, for example: Resume - Backend Developer Intern.'\n    }\n  };\n}\n\nreturn {\n  json: {\n    source: 'gmail',\n    action: 'analyze',\n    recipientEmail,\n    jobRole,\n    subject,\n    fileName,\n    mimeType,\n    fileType\n  },\n  binary: {\n    resumeFile: $binary[selectedKey]\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        -1728
+      ],
+      "id": "dbd93bad-bb52-41a0-a4bc-19b602387412",
+      "name": "Route Gmail Message"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "gmail-analyze",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "analyze",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Analyze"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "gmail-unsupported",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "unsupported_file",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Unsupported File"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        -1744
+      ],
+      "id": "f0080428-9f03-436a-9629-6f26510b7844",
+      "name": "Choose Gmail Next Step"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "gmail-pdf",
+                    "leftValue": "={{ $json.fileType }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PDF"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "gmail-txt",
+                    "leftValue": "={{ $json.fileType }}",
+                    "rightValue": "txt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "TXT"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "gmail-docx",
+                    "leftValue": "={{ $json.fileType }}",
+                    "rightValue": "docx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "DOCX"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        -1856
+      ],
+      "id": "3c85ed14-d0d2-4f99-bf10-6fdbb5657649",
+      "name": "Choose Gmail Resume Type"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "resumeFile",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        -2112
+      ],
+      "id": "283557d4-f24e-4d59-9e17-a1149155ba38",
+      "name": "Extract Gmail PDF Text"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "resumeFile",
+        "destinationKey": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        -1920
+      ],
+      "id": "06905e0a-252f-471e-ab08-84f9a40f6ff7",
+      "name": "Extract Gmail TXT Text"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "resumeFile",
+        "destinationKey": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        -1728
+      ],
+      "id": "a2008521-b357-4e23-98ca-590a9905a86b",
+      "name": "Extract Gmail DOCX Text"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const route = $('Route Gmail Message').first().json;\nconst resumeText = $json.text || $json.resume_text || $json.data || '';\n\nreturn {\n  json: {\n    source: 'gmail',\n    recipientEmail: route.recipientEmail,\n    jobRole: route.jobRole,\n    fileName: route.fileName,\n    resumeText: String(resumeText).trim()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        -1952
+      ],
+      "id": "41042a39-4cca-46d0-8b53-43b7bc17e3ce",
+      "name": "Prepare Gmail Analysis Input"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Target Job Role:\n{{ $json.jobRole }}\n\nResume File:\n{{ $json.fileName }}\n\nResume Content:\n{{ $json.resumeText }}\n\nAnalyze the resume professionally for the target role. If Resume Content is empty or unreadable, tell the user to upload a clearer PDF, DOCX, or TXT file.",
+        "options": {
+          "systemMessage": "You are an advanced ATS Resume Reviewer.\n\nYour job is to analyze a user's resume against the target job role or job description they provided.\n\nReturn output in this exact structure:\n\n📊 ATS Resume Analysis\n\n✅ ATS Match Score: XX/100\n\n🎯 Target Role:\n[Target Job Role]\n\n✅ Matching Skills:\n• Skill 1\n• Skill 2\n• Skill 3\n\n❌ Missing Keywords:\n• Keyword 1\n• Keyword 2\n• Keyword 3\n\n⚠️ Resume Weaknesses:\n• Weakness 1\n• Weakness 2\n• Weakness 3\n\n💡 Improvement Suggestions:\n• Suggestion 1\n• Suggestion 2\n• Suggestion 3\n\n🚀 Hiring Readiness:\n[Beginner / Moderate / Strong Candidate]\n\n📌 Final Recommendation:\nA concise final evaluation explaining whether the candidate is suitable for the role and what improvements would increase interview chances.\n\nRules:\n- Never invent experience, projects, certifications, achievements, or skills.\n- Only analyze information present in the resume content.\n- Be honest, realistic, constructive, and recruiter-oriented.\n- Penalize missing role-specific keywords.\n- Reward measurable achievements, relevant technical projects, links, and clear structure.\n- Keep responses short enough for Telegram."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1472,
+        -1952
+      ],
+      "id": "199d3dd8-f4af-4986-befd-7430b46d20f5",
+      "name": "AI Resume Analyzer Agent Gmail"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1408,
+        -1712
+      ],
+      "id": "3bda538f-79c5-4bd8-b300-92a8942ccec3",
+      "name": "Groq Chat Model Gmail",
+      "credentials": {
+        "groqApi": {
+          "id": "vVQnSF6Kh0h1zAwm",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipientEmail }}",
+        "subject": "Resume Analysis - Please attach a supported resume file",
+        "emailType": "text",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        -1536
+      ],
+      "id": "aa6d24bd-43a4-4039-9049-6d05ed054d0a",
+      "name": "Send Gmail Unsupported File Message",
+      "webhookId": "ce3e9e27-0557-4ac0-8ab0-f8c5a655d984",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "nh8TjqZpr65JIc5s",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Prepare Gmail Analysis Input').first().json.recipientEmail }}",
+        "subject": "=Your ATS Resume Analysis Report - {{ $('Prepare Gmail Analysis Input').first().json.jobRole }}",
+        "emailType": "text",
+        "message": "=Your ATS report is below.\n\n{{ $json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1824,
+        -1952
+      ],
+      "id": "85bb4680-a218-46f2-b5a8-75559dd40795",
+      "name": "Send Report via Gmail",
+      "webhookId": "0a7bf961-9a14-4eec-a161-5711fa26ef30",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "nh8TjqZpr65JIc5s",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        128,
+        -832
+      ],
+      "id": "9454bc38-6014-442e-8141-19e328c378ec",
+      "name": "Telegram Trigger",
+      "webhookId": "64b63d4b-22da-46c9-8368-1c0ad2feeceb",
+      "credentials": {
+        "telegramApi": {
+          "id": "umbC00qSJAqYUmxl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "👋 Welcome to AI Resume Analyzer Bot!\n\nI can analyze your resume for a target job role and provide:\n\n✅ ATS Match Score\n✅ Matching Skills\n✅ Missing Keywords\n✅ Resume Weaknesses\n✅ Improvement Suggestions\n✅ Hiring Readiness\n\nSend either:\n1. Your target job role first, then upload your resume\n2. Your resume first, then I will ask for the job role\n\nSupported resume formats: PDF, DOCX, TXT",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        -1312
+      ],
+      "id": "27f94aab-ffaf-4bb8-bb13-9b1f7ee69526",
+      "name": "Send Welcome Message",
+      "webhookId": "7fd50ce0-788d-4e26-80f9-9073e2e9e966",
+      "credentials": {
+        "telegramApi": {
+          "id": "umbC00qSJAqYUmxl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        -592
+      ],
+      "id": "4fa5713e-914d-4a7b-926e-ff6e79ef92fe",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "vVQnSF6Kh0h1zAwm",
+          "name": "Groq account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "typeVersion": 1,
+      "position": [
+        1936,
+        -592
+      ],
+      "id": "6d6285ee-d5f7-4f81-8c53-c0f4dc912004",
+      "name": "Calculator"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Prepare Analysis Input').first().json.chatId }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2048,
+        -832
+      ],
+      "id": "a3bc4084-41eb-4fa7-bdfa-47fca9ee109d",
+      "name": "Send Report via Telegram Bot",
+      "webhookId": "e9171e0e-35c2-424f-811d-c371e4093506",
+      "credentials": {
+        "telegramApi": {
+          "id": "umbC00qSJAqYUmxl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "maxResults": 1,
+        "filters": {
+          "readStatus": "unread",
+          "sender": "has:attachment"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        128,
+        -1728
+      ],
+      "id": "ea35012d-998f-4a4b-a3a0-da090cb2e58a",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "nh8TjqZpr65JIc5s",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Target Job Role:\n{{ $json.jobRole }}\n\nResume File:\n{{ $json.fileName }}\n\nResume Content:\n{{ $json.resumeText }}\n\nAnalyze the resume professionally for the target role. If Resume Content is empty or unreadable, tell the user to upload a clearer PDF, DOCX, or TXT file.",
+        "options": {
+          "systemMessage": "You are an advanced AI Resume Analyzer Telegram Bot and expert ATS Resume Reviewer.\n\nYour job is to analyze a user's resume against the target job role or job description they provided.\n\nReturn concise, Telegram-friendly output in this exact structure:\n\n✅ ATS Match Score: XX/100\n\n🎯 Target Role:\n[Target Job Role]\n\n✅ Matching Skills:\n• Skill 1\n• Skill 2\n• Skill 3\n\n❌ Missing Keywords:\n• Keyword 1\n• Keyword 2\n• Keyword 3\n\n⚠️ Resume Weaknesses:\n• Weakness 1\n• Weakness 2\n• Weakness 3\n\n💡 Improvement Suggestions:\n• Suggestion 1\n• Suggestion 2\n• Suggestion 3\n\n🚀 Hiring Readiness:\n[Beginner / Moderate / Strong Candidate]\n\n📌 Final Recommendation:\nA concise final evaluation explaining whether the candidate is suitable for the role and what improvements would increase interview chances.\n\nRules:\n- Never invent experience, projects, certifications, achievements, or skills.\n- Only analyze information present in the resume content.\n- Be honest, realistic, constructive, and recruiter-oriented.\n- Penalize missing role-specific keywords.\n- Reward measurable achievements, relevant technical projects, links, and clear structure.\n- Keep responses short enough for Telegram."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1696,
+        -832
+      ],
+      "id": "a95563f4-873a-4772-96e3-513571a6c91d",
+      "name": "AI Resume Analyzer Agent Telegram"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const msg = $json.message || {};\nconst chatId = String(msg.chat?.id || '');\nconst text = (msg.text || '').trim();\nconst doc = msg.document;\n\nconst store = $getWorkflowStaticData('global');\nstore.telegramResumeSessions = store.telegramResumeSessions || {};\n\nif (!chatId) {\n  return { json: { action: 'unsupported', chatId: '', message: 'I could not read this Telegram chat. Please try again.' } };\n}\n\nlet session = store.telegramResumeSessions[chatId] || {};\nstore.telegramResumeSessions[chatId] = session;\n\nif (text === '/start') {\n  store.telegramResumeSessions[chatId] = {};\n  return { json: { action: 'welcome', chatId } };\n}\n\nif (doc) {\n  const fileName = doc.file_name || '';\n  const mimeType = doc.mime_type || '';\n  const extension = fileName.split('.').pop()?.toLowerCase() || '';\n  const supported =\n    mimeType === 'application/pdf' ||\n    mimeType === 'text/plain' ||\n    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||\n    ['pdf', 'txt', 'docx'].includes(extension);\n\n  if (!supported) {\n    return {\n      json: {\n        action: 'unsupported_file',\n        chatId,\n        fileName,\n        mimeType\n      }\n    };\n  }\n\n  session.fileId = doc.file_id;\n  session.fileName = fileName;\n  session.mimeType = mimeType;\n  session.extension = extension;\n\n  if (session.jobRole) {\n    return {\n      json: {\n        action: 'analyze',\n        chatId,\n        jobRole: session.jobRole,\n        fileId: session.fileId,\n        fileName: session.fileName,\n        mimeType: session.mimeType,\n        extension: session.extension\n      }\n    };\n  }\n\n  return {\n    json: {\n      action: 'ask_role',\n      chatId,\n      fileId: session.fileId,\n      fileName: session.fileName,\n      mimeType: session.mimeType,\n      extension: session.extension\n    }\n  };\n}\n\nif (text) {\n  if (text.startsWith('/')) {\n    return { json: { action: 'welcome', chatId } };\n  }\n\n  session.jobRole = text;\n\n  if (session.fileId) {\n    return {\n      json: {\n        action: 'analyze',\n        chatId,\n        jobRole: session.jobRole,\n        fileId: session.fileId,\n        fileName: session.fileName,\n        mimeType: session.mimeType,\n        extension: session.extension\n      }\n    };\n  }\n\n  return {\n    json: {\n      action: 'ask_resume',\n      chatId,\n      jobRole: session.jobRole\n    }\n  };\n}\n\nreturn {\n  json: {\n    action: 'unsupported',\n    chatId,\n    message: 'Please send a target job role or attach your resume as PDF, DOCX, or TXT.'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        -832
+      ],
+      "id": "21ee5796-27f6-46ad-b2cf-fb8c25e83341",
+      "name": "Route Telegram Message"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8d6bd91a-ae93-4060-913d-5bbfb7013548",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "welcome",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Welcome"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "893bc709-8051-4e3b-b3e6-68966566fb8d",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "ask_resume",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Ask Resume"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a58c6bd6-99d7-44f2-a41b-4116ad2fb1b8",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "ask_role",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Ask Role"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "76d07424-64be-477c-a04e-c05f2539058d",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "analyze",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Analyze"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "740dc19b-82d8-4883-811a-28fcb033e8b0",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "unsupported_file",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Unsupported File"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        -896
+      ],
+      "id": "3c493334-edb7-4f14-be11-ccdf40586206",
+      "name": "Choose Next Step"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=✅ Job role received:\n{{ $json.jobRole }}\n\nNow upload your resume file as PDF, DOCX, or TXT.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        -1120
+      ],
+      "id": "c5f59699-719b-4d83-a02b-c22cc86459a6",
+      "name": "Ask For Resume",
+      "webhookId": "b35f1c97-2769-48d6-8cd3-1a4bb1cf8dcb",
+      "credentials": {
+        "telegramApi": {
+          "id": "umbC00qSJAqYUmxl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=✅ Resume received: {{ $json.fileName || 'file' }}\n\nPlease send your target job role or job description now.\n\nExample: Backend Developer Intern skilled in Node.js, Docker, and MongoDB",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        -928
+      ],
+      "id": "d96add50-1bfb-4e1b-93ac-357f246924ab",
+      "name": "Ask For Job Role",
+      "webhookId": "2e6656e7-8851-4c86-9d14-317c17ae6d63",
+      "credentials": {
+        "telegramApi": {
+          "id": "umbC00qSJAqYUmxl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.fileId }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        -736
+      ],
+      "id": "25f927d3-fefa-4225-96f5-30d22c232ab4",
+      "name": "Get Resume File",
+      "webhookId": "65927e42-c853-4ead-8fc2-bbbada5c9a87",
+      "credentials": {
+        "telegramApi": {
+          "id": "umbC00qSJAqYUmxl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.message || 'Please send a target job role or attach your resume as PDF, DOCX, or TXT.' }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        -256
+      ],
+      "id": "ab8eaf1a-573f-4797-8929-ec00056f35bf",
+      "name": "Send Generic Help Message",
+      "webhookId": "9d8bb447-a4b5-48fc-aa6a-9c26a6fa37f6",
+      "credentials": {
+        "telegramApi": {
+          "id": "umbC00qSJAqYUmxl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "70713e48-17a4-4684-b021-d2abf036cf17",
+                    "leftValue": "={{ $('Route Telegram Message').first().json.mimeType || $('Route Telegram Message').first().json.extension }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PDF"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a30c45e1-47c9-4788-a049-ff1231597c66",
+                    "leftValue": "={{ $('Route Telegram Message').first().json.mimeType || $('Route Telegram Message').first().json.extension }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "TXT"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "11f4d9fb-c663-4fc4-b95f-938df9235ea0",
+                    "leftValue": "={{ $('Route Telegram Message').first().json.mimeType || $('Route Telegram Message').first().json.extension }}",
+                    "rightValue": "wordprocessingml.document",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "DOCX"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1024,
+        -768
+      ],
+      "id": "f56542a9-641e-4537-9f98-489d08ce9690",
+      "name": "Choose Resume Type"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "⚠️ Unsupported file type.\n\nPlease upload your resume as PDF, DOCX, or TXT.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1248,
+        -448
+      ],
+      "id": "201aa653-31b1-4b5e-8cf1-7a851a207964",
+      "name": "Send Unsupported File Message",
+      "webhookId": "c9911fb2-b579-4955-bc1f-4155e085b887",
+      "credentials": {
+        "telegramApi": {
+          "id": "umbC00qSJAqYUmxl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        -640
+      ],
+      "id": "2024f9c3-6ce7-4326-8777-94690ef80ef0",
+      "name": "Extract DOCX Text"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        -832
+      ],
+      "id": "9df696c1-afad-48d6-a3c6-258a17070a11",
+      "name": "Extract TXT Text"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        -1024
+      ],
+      "id": "44c10092-ef97-47b5-87d4-18d00baf8bee",
+      "name": "Extract PDF Text"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const route = $('Route Telegram Message').first().json;\nconst resumeText = $json.text || $json.resume_text || $json.data || '';\n\nreturn {\n  json: {\n    chatId: route.chatId,\n    jobRole: route.jobRole,\n    fileName: route.fileName,\n    resumeText: String(resumeText).trim()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -832
+      ],
+      "id": "63a79109-e48e-4729-a84d-2e2bd80d259b",
+      "name": "Prepare Analysis Input"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Route Gmail Message": {
+      "main": [
+        [
+          {
+            "node": "Choose Gmail Next Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Gmail Next Step": {
+      "main": [
+        [
+          {
+            "node": "Choose Gmail Resume Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Gmail Unsupported File Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Gmail Unsupported File Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Gmail Resume Type": {
+      "main": [
+        [
+          {
+            "node": "Extract Gmail PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Gmail TXT Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Gmail DOCX Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Gmail Unsupported File Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Gmail PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Gmail Analysis Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Gmail TXT Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Gmail Analysis Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Gmail DOCX Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Gmail Analysis Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Gmail Analysis Input": {
+      "main": [
+        [
+          {
+            "node": "AI Resume Analyzer Agent Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Resume Analyzer Agent Gmail": {
+      "main": [
+        [
+          {
+            "node": "Send Report via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model Gmail": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Resume Analyzer Agent Gmail",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Route Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Resume Analyzer Agent Telegram",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Resume Analyzer Agent Telegram",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Route Gmail Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Resume Analyzer Agent Telegram": {
+      "main": [
+        [
+          {
+            "node": "Send Report via Telegram Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Choose Next Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Next Step": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask For Resume",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask For Job Role",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Resume File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unsupported File Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Generic Help Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Resume File": {
+      "main": [
+        [
+          {
+            "node": "Choose Resume Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Resume Type": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract TXT Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract DOCX Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Unsupported File Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract DOCX Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Analysis Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract TXT Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Analysis Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Analysis Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Analysis Input": {
+      "main": [
+        [
+          {
+            "node": "AI Resume Analyzer Agent Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4ba7c8c9-d573-4918-8299-eae20d723067",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "251d0bedf1690c5f4dfa838393c94e4740b43947495498f2c710b44a2a45c25f"
+  },
+  "id": "9JI8yjGLdMKoDRib",
+  "tags": []
+}
