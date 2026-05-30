@@ -74,11 +74,9 @@ Telegram Trigger
 ```bash
 resume-analyzer-bot/
 │
-├── workflows/
-│   └── Resume Analyzer - Gmail + Telegram.json
-│
-├── screenshots/
-└── README.md
+├── Testing Resumes/
+├── README.md
+└── Resume Analyzer - Gmail + Telegram.json
 ```
 
 # Local Setup using Docker Desktop
