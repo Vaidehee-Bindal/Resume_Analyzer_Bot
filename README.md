@@ -4,6 +4,9 @@ An AI-powered Resume Analyzer Automation built with **n8n**, **Telegram Bot API*
 
 This workflow automatically analyzes resumes against a target job role and generates an ATS-style evaluation report including ATS score, missing keywords, weaknesses, hiring readiness, and improvement suggestions.
 
+# Video Demo
+https://github.com/user-attachments/assets/46740128-9805-49d6-a732-a6c07dbcbc12
+
 # Automation Workflow
 <img width="1710" height="619" alt="Workflow Architecture" src="https://github.com/user-attachments/assets/ecba2744-63c1-4463-b2af-e5c677e5f051" />
 Gmail Trigger
